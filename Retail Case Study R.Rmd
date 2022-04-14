@@ -1,0 +1,420 @@
+---
+title: "Customer Analysis for Retails"
+author: "Swati Sharma"
+date: "26/02/2022"
+output: html_document
+---
+
+
+
+Business Problem : 
+
+A retail store is required to analyze the day-to-day transactions and keep a track of its customers spread across various locations along with their purchase/return across various categories.
+
+```{r}
+customer <- read.csv("C:/Users/sharm/OneDrive/Desktop/Retail Analysis R/Customer.csv")
+Product.Info <- read.csv("C:/Users/sharm/OneDrive/Desktop/Retail Analysis R/prod_cat_info.csv")
+Transactions <- read.csv("C:/Users/sharm/OneDrive/Desktop/Retail Analysis R/Transactions.csv")
+```
+
+Comments : All three datasets has been loaded. 
+
+Q 1.) Merge the datasets Custiomer, Product.Info and Transactions as Customer_Final. Ensure to keep all customers who have done transactions with us and select 
+      the join type accordingly.
+      
+  a.) Use the base merge()
+  
+```{r}
+Customer_tran <- merge(x = customer, y = Transactions, by.x = 'customer_Id', by.y = 'cust_id', all.x = FALSE, all.y = TRUE)
+Customer_Final <- merge(x= Customer_tran, y = Product.Info, by.x = 'prod_cat_code', by.y = 'prod_cat_code', all.x = FALSE, all.y = TRUE)
+
+```
+
+ b.) Dplyr merge functions
+
+```{r}
+
+require(dplyr)
+
+
+Cust_tran_d <- dplyr::left_join(x= customer, y= Transactions, by = c("customer_Id"= "cust_id"))
+Cust_final_d <- dplyr::left_join(x=Cust_tran_d, y= Product.Info, by = c("prod_cat_code" = "prod_cat_code"))
+
+```
+ 
+ 
+2.) Prepare a summary report for the merged data set. 
+
+```{r}
+
+summary(Customer_Final)
+
+```
+Lets's find if there are any missing values in the given dataset.
+
+```{r}
+
+duplicated(Customer_Final)
+
+sum(is.na(Customer_Final))
+
+```
+
+
+
+a.) Get the column names and their corresponding Data Types. 
+
+```{r}
+sapply(Customer_Final, class)
+
+```
+As, we can see that the data types of given data is not in proper condition, therefore, I'm changing the data types as per the Business requirements. 
+Since, DOB is in Character class, hence, changing the data-type to Date. 
+
+```{r}
+
+Customer_Final$DOB <- as.Date(Customer_Final$DOB, "%d-%m-%Y")
+
+class(Customer_Final$DOB)
+
+```
+Since, tran_date is in Character class, hence, changing the data-type to Date. 
+
+```{r}
+Customer_Final$tran_date <- as.Date(Customer_Final$tran_date, "%d-%m-%Y")
+
+class(Customer_Final$tran_date)
+
+```
+
+
+b.) Top/Bottom 10 observations
+
+```{r}
+head(Customer_Final, 10)
+
+tail(Customer_Final, 10)
+```
+c.) "Five-number Summary" for continuous variables (min, Q1, median, Q3 and max)
+
+```{r}
+
+con_data<- Customer_Final[,c("Qty", "Rate", "Tax", "total_amt")]
+
+summary(con_data, na.rm = TRUE)
+
+#(Customer_Final, na.rm = TRUE)
+```
+
+d.) Frequency tables for all the categorical variables. 
+
+```{r}
+
+require(dplyr)
+
+
+Freq_table <- Customer_Final %>% count(prod_cat_code, prod_cat, customer_Id, Gender, city_code,  transaction_id, prod_subcat_code, Store_type, prod_subcat)
+
+Freq_table
+
+```
+
+3.) Generate histograms for all continuous variables and frequency bars for categorical variables.
+
+```{r}
+
+hist(con_data$Qty, col = "Blue", border = "red")
+hist(con_data$Rate, col = "green", border = "black")
+hist(con_data$Tax, col = "purple", border = "brown")
+hist(con_data$total_amt, col = "red", border = "black")
+
+
+```
+
+
+4.) Calculate the following information using the merged data set:
+
+  a.) Time period of the available transaction data. 
+  
+```{r}
+require(dplyr)
+
+a= min(Customer_Final$tran_date, na.rm = TRUE)
+
+b= max(Customer_Final$tran_date, na.rm = TRUE)
+
+
+print(paste("Time period of the available transaction data is :", a, "to", b))
+
+```
+  
+  
+  
+  b.) Count of transactions where the total amount of transaction was negative. 
+  
+```{r}
+
+
+con_data %>% count(total_amt < 0)
+
+# Or
+
+sum(con_data$total_amt < 0)
+
+```
+
+
+  
+5.) Analyze which product categories are more popular among females vs males customers.
+
+
+```{r}
+require(dplyr)
+
+Customer_Final%>%dplyr::group_by(Gender, prod_cat)%>%dplyr::summarise(sum_qty = sum(Qty))
+
+
+```
+
+
+6.) Which City code has the maximum customers and what was the percentage of customers from that city? 
+
+```{r}
+
+cnt_trans <- Customer_Final%>%dplyr::group_by(city_code, transaction_id)%>%count(transaction_id)
+
+cnt_trans$'percentage_of_cx' <- 100*(cnt_trans$n/sum(cnt_trans$n))
+
+cnt_trans1 <- cnt_trans[which.max(cnt_trans$n),]
+
+cnt_trans1
+
+
+# Hence, city code 5 has the maximum number of the customers
+
+```
+
+7.) Which store type sells the maximum products by value and by quantity.?
+
+```{r}
+
+store_sell <- Customer_Final%>%dplyr::group_by(total_amt, Qty, Store_type)%>%count(Qty)
+
+store_sell <- store_sell[which.max(store_sell$n),]
+
+store_sell
+
+```
+
+8.) What was the total amount earned from the "Electronics" and "Clothing" categories from Flagship Stores?
+
+```{r}
+
+Tot_amt_Flagship_Clothing_Electronics <- Customer_Final%>%dplyr::select(prod_cat, total_amt, Store_type) %>%filter(prod_cat %in%c("Clothing", "Electronics"), Store_type == "Flagship store")
+
+View(Tot_amt_Flagship_Clothing_Electronics)
+
+sum(Tot_amt_Flagship_Clothing_Electronics$total_amt, rm.na=TRUE)
+
+```
+
+9.) What was the total amount earned from "Male" customers under the "Electronics" category?
+
+
+```{r}
+
+Tot_amt_Electronics_byMale <- Customer_Final%>%dplyr::select(prod_cat, total_amt, Gender)%>%filter(prod_cat == "Electronics", Gender== "M")
+
+View(Tot_amt_Electronics_byMale)
+
+sum(Tot_amt_Electronics_byMale$total_amt, rm.na=TRUE)
+
+```
+
+10.) How many customers have more than 10 unique transactions, after removing all transactions which have any negative amounts?
+
+```{r}
+
+cust_with_more_trans <- Customer_Final%>%dplyr::select(customer_Id, transaction_id, total_amt)%>%filter(total_amt >=0)
+cust_with_more_trans
+
+cust_with_more_trans <- cust_with_more_trans%>% dplyr::group_by(customer_Id)%>%count(customer_Id, transaction_id)
+cust_with_more_trans
+
+cust_with_more_trans <- cust_with_more_trans%>%dplyr::group_by(customer_Id)%>% dplyr::summarise(tot_trans = count(transaction_id))
+
+cust_with_more_trans <- cust_with_more_trans%>%dplyr::group_by(customer_Id, transaction_id)
+
+res1<- dplyr::summarise(cust_with_more_trans, Count_tot_trans = length(transaction_id))
+
+# unable to solve it. 
+
+```
+
+11.) For all customers aged between 25-35, find out :
+
+Since, we do not have age column in the dataset so, I'm finding the age of the customers first. 
+
+```{r}
+today <- Sys.Date()
+
+today
+
+Customer_Final$age <- today- Customer_Final$DOB
+
+Customer_Final$age <- round(Customer_Final$age/365.25, 2)
+
+Customer_Final$age <- lapply(Customer_Final$age, as.integer)
+
+View(Customer_Final)
+
+class(Customer_Final$age)
+
+```
+
+After finding the age of the customers, I'm going to create bins to get the age category for further queries. Since, class of age is List so, first I'm going to convert it to numeric. 
+
+
+```{r}
+
+Customer_Final$age <- as.numeric(unlist(Customer_Final$age))
+class(Customer_Final$age)
+
+
+Customer_Final$AgeGroup <- cut(Customer_Final$age, 
+                               breaks = c(11, 22, 33, 44, 55, 66, 77, 88, 99),
+                               labels = c("15-24 years", "25-35 years", "36-45 years", "46-55 years", "56-65 years", "66-75 years", "76-85 years", "86-99years"),
+                               right = FALSE)
+
+
+View(Customer_Final$AgeGroup)
+
+```
+   a.) What was the total amount spent for "Electronics" and "Books" product categories?
+   
+```{r}
+
+require(dplyr)
+
+tot_amt_Electronics_and_Books <- Customer_Final%>%dplyr::select(prod_cat, total_amt, AgeGroup)%>% filter(prod_cat %in%c("Electronics", "Books"), AgeGroup == "25-35 years")
+tot_amt_Electronics_and_Books
+
+res <- sum(tot_amt_Electronics_and_Books$total_amt, rm.na = TRUE)
+print(paste("Total amount spent for Electronics and Books by the buyers between age 25 to 35 :", res ))
+
+```
+   
+
+   
+   b.) What was the total amount spent by these customers between 1st Jan, 2014 to 1st Mar, 2014?
+   
+```{r}
+
+tot_amt_between_dates <- Customer_Final%>%dplyr::select(prod_cat, total_amt, AgeGroup, tran_date)%>% filter(prod_cat %in%c("Electronics", "Books"), AgeGroup == "25-35 years")
+
+tot_amt_between_dates
+
+new_data_between_two_dates <- tot_amt_between_dates[tot_amt_between_dates$tran_date >"2013-12-31" & tot_amt_between_dates$tran_date < "2014-03-02"]
+
+new_data_between_two_dates <- tot_amt_between_dates[tot_amt_between_dates$tran_date between("2013-12-31" & "2014-03-02")]
+
+new_data_between_two_dates <- dplyr::between(tot_amt_between_dates$tran_date, "2014-01-01", "2014-03-01")
+
+
+# Unable to get this done. 
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
